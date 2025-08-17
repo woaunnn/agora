@@ -4,7 +4,7 @@ import { Card, CardContent, Box } from '@mui/material'
 import { styled } from '@mui/material/styles'
 
 export const AuthCard = styled(Card)(() => ({
-  maxWidth: 400,
+  maxWidth: 500,
   width: '100%',
   margin: '0 auto',
   borderRadius: 16,

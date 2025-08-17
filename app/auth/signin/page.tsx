@@ -3,6 +3,9 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 import { Box, IconButton, InputAdornment, Alert } from '@mui/material'
 import { Visibility, VisibilityOff } from '@mui/icons-material'
 
@@ -11,34 +14,49 @@ import { StyledTextField, StyledButton, LinkButton } from '../../../styles/commo
 import { SignInTitle, SignInForm, ForgotPasswordLink } from '../../../styles/signin/SignInStyles'
 import { ClientAuthService } from '../../../lib/auth/client-auth'
 
+// Schema สำหรับ validation
+const signInSchema = yup.object().shape({
+  email: yup
+    .string()
+    .required('กรุณากรอกอีเมล')
+    .email('รูปแบบอีเมลไม่ถูกต้อง'),
+  password: yup
+    .string()
+    .required('กรุณากรอกรหัสผ่าน')
+    .min(6, 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'),
+})
+
+interface SignInFormData {
+  email: string
+  password: string
+}
+
 const SignIn = () => {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+  const [submitError, setSubmitError] = useState('')
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors }
+  } = useForm<SignInFormData>({
+    resolver: yupResolver(signInSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    }
   })
 
   const handleClickShowPassword = () => setShowPassword(!showPassword)
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-    // Clear error when user starts typing
-    if (error) setError('')
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const onSubmit = async (data: SignInFormData) => {
     setLoading(true)
-    setError('')
+    setSubmitError('')
 
     try {
-      const result = await ClientAuthService.signIn(formData.email, formData.password)
+      const result = await ClientAuthService.signIn(data.email, data.password)
       
       if (result.success) {
         // ตรวจสอบ callback URL จาก query params
@@ -47,10 +65,10 @@ const SignIn = () => {
         
         router.push(callbackUrl)
       } else {
-        setError(result.error || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ')
+        setSubmitError(result.error || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ')
       }
     } catch {
-      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ')
+      setSubmitError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ')
     } finally {
       setLoading(false)
     }
@@ -61,61 +79,69 @@ const SignIn = () => {
       <AuthCard>
         <AuthCardContent>
           <SignInTitle>
-            Login
+            เข้าสู่ระบบ
           </SignInTitle>
           
-          {error && (
+          {submitError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
+              {submitError}
             </Alert>
           )}
           
-          <SignInForm onSubmit={handleSubmit}>
-            <StyledTextField
-              fullWidth
-              label="Email"
+          <SignInForm onSubmit={handleSubmit(onSubmit)}>
+            <Controller
               name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              variant="outlined"
-              disabled={loading}
-              placeholder="user@example.com หรือ admin@example.com"
+              control={control}
+              render={({ field }) => (
+                <StyledTextField
+                  {...field}
+                  fullWidth
+                  label="อีเมล"
+                  type="email"
+                  error={!!errors.email}
+                  helperText={errors.email?.message}
+                  disabled={loading}
+                  placeholder="user@example.com หรือ admin@example.com"
+                />
+              )}
             />
             
-            <StyledTextField
-              fullWidth
-              label="Password"
+            <Controller
               name="password"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={handleChange}
-              required
-              variant="outlined"
-              disabled={loading}
-              placeholder="user123 หรือ admin123"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={handleClickShowPassword}
-                      edge="end"
-                      disabled={loading}
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
+              control={control}
+              render={({ field }) => (
+                <StyledTextField
+                  {...field}
+                  fullWidth
+                  label="รหัสผ่าน"
+                  type={showPassword ? 'text' : 'password'}
+                  error={!!errors.password}
+                  helperText={errors.password?.message}
+                  disabled={loading}
+                  placeholder="user123 หรือ admin123"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="toggle password visibility"
+                          onClick={handleClickShowPassword}
+                          edge="end"
+                          disabled={loading}
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              )}
             />
 
-            {/* <ForgotPasswordLink>
+            <ForgotPasswordLink>
               <LinkButton size="small" disabled={loading}>
-                Forgot Password?
+                ลืมรหัสผ่าน?
               </LinkButton>
-            </ForgotPasswordLink> */}
+            </ForgotPasswordLink>
 
             <StyledButton
               type="submit"
@@ -124,19 +150,14 @@ const SignIn = () => {
               size="large"
               disabled={loading}
             >
-              {loading ? 'Loading...' : 'Login'}
+              {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
             </StyledButton>
           </SignInForm>
 
           <Box sx={{ textAlign: 'center', mt: 3 }}>
-             <ForgotPasswordLink>
-              <LinkButton size="small" disabled={loading}>
-                Forgot Password?
-              </LinkButton>
-            </ForgotPasswordLink>
             <Link href="/auth/signup" passHref>
               <LinkButton disabled={loading}>
-                {`Don't have an account? Sign Up`}
+                ยังไม่มีบัญชี? สมัครสมาชิก
               </LinkButton>
             </Link>
           </Box>
